@@ -9,7 +9,8 @@
     <title>NexaCart | Smart E-Commerce</title>
 
     <!-- CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='home.css') }}">
+    <link rel="stylesheet"
+      href="{{ url_for('static', filename='home.css') }}">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -84,13 +85,10 @@
 
             <!-- LOGIN CONNECTION — DON'T REMOVE -->
 
-            <a href="login.html" class="login-btn">
-
-                <i class="fa-regular fa-user"></i>
-
-                Login
-
-            </a>
+           <a href="{{ url_for('login') }}" class="login-btn">
+    <i class="fa-regular fa-user"></i>
+    Login
+</a>
 
         </div>
 
@@ -922,8 +920,7 @@
 
 
     <!-- ================= JAVASCRIPT ================= -->
-
-  <script src="{{ url_for('static', filename='home.js') }}"></script>
+<script src="{{ url_for('static', filename='home.js') }}"></script>
 
 </body>
 
