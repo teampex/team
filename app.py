@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, session
 import mysql.connector
+from mysql.connector import Error
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -9,6 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
+# Secret key for session
 app.secret_key = "nexacart-secret-key"
 
 
@@ -17,6 +19,10 @@ app.secret_key = "nexacart-secret-key"
 # =========================================================
 
 def get_db_connection():
+    """
+    Create and return a MySQL database connection.
+    """
+
     return mysql.connector.connect(
         host="localhost",
         user="root",
@@ -31,6 +37,24 @@ def get_db_connection():
 
 @app.route("/")
 def home():
+    return render_template("home.html")
+
+
+# =========================================================
+# HOME PAGE DIRECT URL
+# =========================================================
+
+@app.route("/home")
+def home_page():
+    return render_template("home.html")
+
+
+# =========================================================
+# LOGIN PAGE
+# =========================================================
+
+@app.route("/login", methods=["GET"])
+def login_page():
     return render_template("index.html")
 
 
@@ -41,38 +65,86 @@ def home():
 @app.route("/register", methods=["POST"])
 def register():
 
-    data = request.get_json(silent=True) or {}
-
-    username = data.get("username")
-    email = data.get("email")
-    phone = data.get("phone")
-    password = data.get("password")
-
-    # Remove extra spaces
-    if username:
-        username = username.strip()
-
-    if email:
-        email = email.strip().lower()
-
-    if phone:
-        phone = phone.strip()
-
-    # Check empty fields
-    if not username or not email or not phone or not password:
-
-        return jsonify({
-            "success": False,
-            "message": "Please fill all fields."
-        }), 400
+    db = None
+    cursor = None
 
     try:
 
-        # Connect database
+        # -------------------------------------------------
+        # GET JSON DATA FROM FRONTEND
+        # -------------------------------------------------
+
+        data = request.get_json(silent=True)
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "message": "No registration data received."
+            }), 400
+
+
+        # -------------------------------------------------
+        # GET FORM VALUES
+        # -------------------------------------------------
+
+        username = data.get("username")
+        email = data.get("email")
+        phone = data.get("phone")
+        password = data.get("password")
+
+
+        # -------------------------------------------------
+        # CLEAN DATA
+        # -------------------------------------------------
+
+        if username:
+            username = username.strip()
+
+        if email:
+            email = email.strip().lower()
+
+        if phone:
+            phone = phone.strip()
+
+
+        # -------------------------------------------------
+        # CHECK EMPTY FIELDS
+        # -------------------------------------------------
+
+        if not username or not email or not phone or not password:
+
+            return jsonify({
+                "success": False,
+                "message": "Please fill all fields."
+            }), 400
+
+
+        # -------------------------------------------------
+        # CONNECT TO DATABASE
+        # -------------------------------------------------
+
         db = get_db_connection()
+
+        if not db.is_connected():
+
+            return jsonify({
+                "success": False,
+                "message": "Database connection failed."
+            }), 500
+
+
+        print("Database connected successfully.")
+        print("Database:", db.database)
+
+
         cursor = db.cursor()
 
-        # Check existing username or email
+
+        # -------------------------------------------------
+        # CHECK EXISTING USERNAME / EMAIL
+        # -------------------------------------------------
+
         check_query = """
             SELECT id
             FROM users
@@ -86,20 +158,26 @@ def register():
 
         existing_user = cursor.fetchone()
 
-        if existing_user:
 
-            cursor.close()
-            db.close()
+        if existing_user:
 
             return jsonify({
                 "success": False,
                 "message": "Username or Email already exists."
             }), 409
 
-        # Hash password
+
+        # -------------------------------------------------
+        # HASH PASSWORD
+        # -------------------------------------------------
+
         password_hash = generate_password_hash(password)
 
-        # Insert user
+
+        # -------------------------------------------------
+        # INSERT NEW USER
+        # -------------------------------------------------
+
         insert_query = """
             INSERT INTO users
             (
@@ -108,7 +186,13 @@ def register():
                 phone,
                 password_hash
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES
+            (
+                %s,
+                %s,
+                %s,
+                %s
+            )
         """
 
         cursor.execute(
@@ -121,24 +205,143 @@ def register():
             )
         )
 
+
+        # -------------------------------------------------
+        # GET INSERTED USER ID
+        # -------------------------------------------------
+
+        new_user_id = cursor.lastrowid
+
+
+        # -------------------------------------------------
+        # COMMIT DATABASE
+        # -------------------------------------------------
+
         db.commit()
 
-        cursor.close()
-        db.close()
+
+        print("----------------------------------------")
+        print("NEW USER REGISTERED")
+        print("User ID :", new_user_id)
+        print("Username:", username)
+        print("Email   :", email)
+        print("Phone   :", phone)
+        print("Database:", db.database)
+        print("----------------------------------------")
+
+
+        # -------------------------------------------------
+        # VERIFY INSERT
+        # -------------------------------------------------
+
+        verify_cursor = db.cursor()
+
+        verify_cursor.execute(
+            """
+            SELECT id, username, email
+            FROM users
+            WHERE id = %s
+            """,
+            (new_user_id,)
+        )
+
+        saved_user = verify_cursor.fetchone()
+
+        verify_cursor.close()
+
+
+        if saved_user is None:
+
+            print("WARNING: User was not found after INSERT.")
+
+            return jsonify({
+                "success": False,
+                "message": "Registration could not be verified."
+            }), 500
+
+
+        # -------------------------------------------------
+        # SUCCESS RESPONSE
+        # -------------------------------------------------
 
         return jsonify({
             "success": True,
-            "message": "Registration successful!"
-        })
+            "message": "Registration successful!",
+            "user_id": new_user_id
+        }), 201
 
-    except mysql.connector.Error as error:
 
-        print("MySQL Error:", error)
+    # =====================================================
+    # MYSQL ERROR
+    # =====================================================
+
+    except Error as error:
+
+        if db:
+            try:
+                db.rollback()
+            except:
+                pass
+
+        print("----------------------------------------")
+        print("MYSQL ERROR DURING REGISTRATION")
+        print(error)
+        print("----------------------------------------")
+
 
         return jsonify({
             "success": False,
-            "message": "Database error occurred."
+            "message": "Database error occurred.",
+            "error": str(error)
         }), 500
+
+
+    # =====================================================
+    # OTHER ERROR
+    # =====================================================
+
+    except Exception as error:
+
+        if db:
+            try:
+                db.rollback()
+            except:
+                pass
+
+        print("----------------------------------------")
+        print("REGISTRATION ERROR")
+        print(error)
+        print("----------------------------------------")
+
+
+        return jsonify({
+            "success": False,
+            "message": "Something went wrong.",
+            "error": str(error)
+        }), 500
+
+
+    # =====================================================
+    # CLOSE DATABASE
+    # =====================================================
+
+    finally:
+
+        if cursor:
+
+            try:
+                cursor.close()
+            except:
+                pass
+
+        if db:
+
+            try:
+                if db.is_connected():
+                    db.close()
+                    print("Database connection closed.")
+            except:
+                pass
 
 
 # =========================================================
@@ -148,30 +351,74 @@ def register():
 @app.route("/login", methods=["POST"])
 def login():
 
-    data = request.get_json(silent=True) or {}
-
-    username = data.get("username")
-    password = data.get("password")
-
-    # Remove extra spaces
-    if username:
-        username = username.strip()
-
-    # Check empty fields
-    if not username or not password:
-
-        return jsonify({
-            "success": False,
-            "message": "Username and password are required."
-        }), 400
+    db = None
+    cursor = None
 
     try:
 
-        # Connect database
+        # -------------------------------------------------
+        # GET JSON DATA
+        # -------------------------------------------------
+
+        data = request.get_json(silent=True)
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "message": "No login data received."
+            }), 400
+
+
+        # -------------------------------------------------
+        # GET USERNAME & PASSWORD
+        # -------------------------------------------------
+
+        username = data.get("username")
+        password = data.get("password")
+
+
+        # -------------------------------------------------
+        # CLEAN USERNAME
+        # -------------------------------------------------
+
+        if username:
+            username = username.strip()
+
+
+        # -------------------------------------------------
+        # CHECK EMPTY FIELDS
+        # -------------------------------------------------
+
+        if not username or not password:
+
+            return jsonify({
+                "success": False,
+                "message": "Username and password are required."
+            }), 400
+
+
+        # -------------------------------------------------
+        # CONNECT DATABASE
+        # -------------------------------------------------
+
         db = get_db_connection()
+
+        if not db.is_connected():
+
+            return jsonify({
+                "success": False,
+                "message": "Database connection failed."
+            }), 500
+
+
         cursor = db.cursor(dictionary=True)
 
-        # Find user
+
+        # -------------------------------------------------
+        # FIND USER
+        # -------------------------------------------------
+
         query = """
             SELECT *
             FROM users
@@ -185,10 +432,11 @@ def login():
 
         user = cursor.fetchone()
 
-        cursor.close()
-        db.close()
 
-        # User not found
+        # -------------------------------------------------
+        # USER NOT FOUND
+        # -------------------------------------------------
+
         if user is None:
 
             return jsonify({
@@ -196,36 +444,144 @@ def login():
                 "message": "Invalid username or password."
             }), 401
 
-        # Check password
-        if check_password_hash(
+
+        # -------------------------------------------------
+        # CHECK PASSWORD
+        # -------------------------------------------------
+
+        password_valid = check_password_hash(
             user["password_hash"],
             password
-        ):
+        )
 
-            # Save customer session
-            session["user_id"] = user["id"]
-            session["username"] = user["username"]
+
+        if not password_valid:
 
             return jsonify({
-                "success": True,
-                "message": "Login successful!",
-                "username": user["username"]
-            })
+                "success": False,
+                "message": "Invalid username or password."
+            }), 401
 
-        # Wrong password
+
+        # -------------------------------------------------
+        # SAVE SESSION
+        # -------------------------------------------------
+
+        session["user_id"] = user["id"]
+        session["username"] = user["username"]
+
+
+        print("----------------------------------------")
+        print("USER LOGIN SUCCESSFUL")
+        print("User ID :", user["id"])
+        print("Username:", user["username"])
+        print("----------------------------------------")
+
+
+        # -------------------------------------------------
+        # SUCCESS
+        # -------------------------------------------------
+
+        return jsonify({
+            "success": True,
+            "message": "Login successful!",
+            "username": user["username"]
+        }), 200
+
+
+    # =====================================================
+    # MYSQL ERROR
+    # =====================================================
+
+    except Error as error:
+
+        print("----------------------------------------")
+        print("MYSQL LOGIN ERROR")
+        print(error)
+        print("----------------------------------------")
+
+
         return jsonify({
             "success": False,
-            "message": "Invalid username or password."
-        }), 401
-
-    except mysql.connector.Error as error:
-
-        print("MySQL Error:", error)
-
-        return jsonify({
-            "success": False,
-            "message": "Database error occurred."
+            "message": "Database error occurred.",
+            "error": str(error)
         }), 500
+
+
+    # =====================================================
+    # OTHER ERROR
+    # =====================================================
+
+    except Exception as error:
+
+        print("----------------------------------------")
+        print("LOGIN ERROR")
+        print(error)
+        print("----------------------------------------")
+
+
+        return jsonify({
+            "success": False,
+            "message": "Something went wrong.",
+            "error": str(error)
+        }), 500
+
+
+    # =====================================================
+    # CLOSE DATABASE
+    # =====================================================
+
+    finally:
+
+        if cursor:
+
+            try:
+                cursor.close()
+            except:
+                pass
+
+        if db:
+
+            try:
+                if db.is_connected():
+                    db.close()
+            except:
+                pass
+
+
+# =========================================================
+# LOGOUT
+# =========================================================
+
+@app.route("/logout", methods=["GET"])
+def logout():
+
+    session.clear()
+
+    return jsonify({
+        "success": True,
+        "message": "Logged out successfully."
+    })
+
+
+# =========================================================
+# CHECK CURRENT LOGIN
+# =========================================================
+
+@app.route("/check-session", methods=["GET"])
+def check_session():
+
+    if "user_id" in session:
+
+        return jsonify({
+            "logged_in": True,
+            "user_id": session["user_id"],
+            "username": session["username"]
+        })
+
+    return jsonify({
+        "logged_in": False
+    })
 
 
 # =========================================================
@@ -233,4 +589,17 @@ def login():
 # =========================================================
 
 if __name__ == "__main__":
-    app.run(debug=True)
+
+    print("----------------------------------------")
+    print("NEXACART SERVER STARTING...")
+    print("----------------------------------------")
+    print("Database: nexacart")
+    print("Host    : localhost")
+    print("Port    : 5000")
+    print("----------------------------------------")
+
+    app.run(
+        debug=True,
+        host="127.0.0.1",
+        port=5000
+    )
