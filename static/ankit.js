@@ -114,17 +114,20 @@ document.addEventListener("DOMContentLoaded", function () {
                         data.username
                     );
 
-                    /*
-                     * Abhi customer dashboard nahi banaya gaya hai.
-                     * Isliye successful login ke baad
-                     * current page par hi rahenge.
-                     */
+
+                    // =================================================
+                    // LOGIN SUCCESS → GO TO HOME PAGE
+                    // =================================================
+
+                    window.location.href = "/";
+
 
                 } else {
 
                     alert(data.message);
 
                 }
+
 
             } catch (error) {
 
@@ -215,7 +218,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     alert(data.message);
 
 
-                    // Clear registration fields
+                    // =================================================
+                    // CLEAR REGISTRATION FIELDS
+                    // =================================================
 
                     document.getElementById(
                         "registerUsername"
@@ -234,7 +239,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     ).value = "";
 
 
-                    // Go back to login
+                    // =================================================
+                    // GO BACK TO LOGIN
+                    // =================================================
 
                     if (authWrapper) {
 
@@ -244,11 +251,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
                     }
 
+
                 } else {
 
                     alert(data.message);
 
                 }
+
 
             } catch (error) {
 
