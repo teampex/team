@@ -85,10 +85,57 @@
 
             <!-- LOGIN CONNECTION — DON'T REMOVE -->
 
-    <a href="/login" class="login-btn">
+    {% if logged_in %}
+
+<div class="user-menu">
+
+    <button type="button"
+            class="user-btn"
+            onclick="toggleUserMenu(event)">
+
+        <i class="fa-regular fa-user"></i>
+        <span>{{ username }}</span>
+        <i class="fa-solid fa-chevron-down"></i>
+
+    </button>
+
+    <div class="user-dropdown" id="userDropdown">
+
+        <div class="user-info">
+
+            <i class="fa-solid fa-circle-user"></i>
+
+            <div>
+                <strong>{{ username }}</strong>
+                <small>Logged in</small>
+            </div>
+
+        </div>
+
+        <hr>
+
+        <a href="/profile">
+            <i class="fa-regular fa-user"></i>
+            My Profile
+        </a>
+
+        <a href="/logout">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            Logout
+        </a>
+
+    </div>
+
+</div>
+
+{% else %}
+
+<a href="{{ url_for('login_page') }}" class="login-btn">
     <i class="fa-regular fa-user"></i>
     Login
-</a>  
+</a>
+
+{% endif %}
 
         </div>
 
