@@ -2141,3 +2141,10 @@ footer p {
         font-size: 10px;
     }
 }
+
+/* Optional */
+.optional {
+    color: #777;
+    font-size: 13px;
+    font-weight: normal;
+}

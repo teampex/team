@@ -174,7 +174,6 @@ document.addEventListener("DOMContentLoaded", function () {
             if (
                 !username ||
                 !email ||
-                !phone ||
                 !password
             ) {
 

@@ -131,11 +131,10 @@ def register():
         # CHECK EMPTY FIELDS
         # -------------------------------------------------
 
-        if not username or not email or not phone or not password:
-
+        if not username or not email or not password:
             return jsonify({
-                "success": False,
-                "message": "Please fill all fields."
+             "success": False,
+            "message": "Please fill all required fields."
             }), 400
 
 
