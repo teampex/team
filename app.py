@@ -104,7 +104,7 @@ def register():
 
 
         # -------------------------------------------------
-        # GET FORM VALUES
+        # GET FORM VALUES 
         # -------------------------------------------------
 
         username = data.get("username")
