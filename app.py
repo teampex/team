@@ -29,7 +29,7 @@ def get_db_connection():
 
 
 # =========================================================
-# MAKE SESSION AVAILABLE IN ALL HTML PAGES
+# MAKE SESSION AVAILABLE IN ALL HTML PAGES 
 # =========================================================
 
 @app.context_processor
